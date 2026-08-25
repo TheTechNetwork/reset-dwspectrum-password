@@ -67,9 +67,15 @@ function Ensure-Sqlite3 {
   #      so if you reached the script you can reach the tool), SHA-256 verified
   param([string]$PreferredPath)
 
-  if ($PreferredPath -and (Test-Path $PreferredPath)) { return $PreferredPath }
+  if ($PreferredPath -and (Test-Path $PreferredPath)) {
+    Write-Host "sqlite3.exe source: -Sqlite3Path -> $PreferredPath"
+    return $PreferredPath
+  }
   $local = Join-Path $WorkDir 'sqlite3.exe'
-  if (Test-Path $local) { return $local }
+  if (Test-Path $local) {
+    Write-Host "sqlite3.exe source: existing local copy -> $local"
+    return $local
+  }
 
   Write-Host 'sqlite3.exe not found locally - fetching the official tool...'
 
@@ -88,12 +94,16 @@ function Ensure-Sqlite3 {
       foreach ($year in @($curYear, ($curYear - 1))) {
         $url = "https://www.sqlite.org/$year/$fileName"
         try {
+          Write-Host "sqlite3.exe source: downloading from $url"
           Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop | Out-Null
           Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing -ErrorAction Stop
           $extractDir = Join-Path $WorkDir 'sqlite-tools'
           Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
           $exe = Get-ChildItem $extractDir -Recurse -Filter 'sqlite3.exe' | Select-Object -First 1
-          if ($exe) { return $exe.FullName }
+          if ($exe) {
+            Write-Host "sqlite3.exe source: sqlite.org ($url) -> $($exe.FullName)"
+            return $exe.FullName
+          }
         } catch { continue }
       }
     }
@@ -109,7 +119,7 @@ function Ensure-Sqlite3 {
         Remove-Item $local -ErrorAction SilentlyContinue
         throw "sqlite3.exe from dw.it2.sh failed SHA-256 check (expected $Sqlite3Sha256, got $actual). Refusing to use it."
       }
-      Write-Host 'sqlite3.exe SHA-256 verified.'
+      Write-Host "sqlite3.exe source: dw.it2.sh fallback (SHA-256 verified) -> $local"
       return $local
     }
   } catch {

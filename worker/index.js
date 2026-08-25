@@ -28,10 +28,13 @@ const SCRIPTS_BASE = `${REPO_RAW}/scripts`;
 // Command (and alias) -> script filename in /scripts.
 const ROUTES = {
   gethash:      "get-hash.ps1",
+  get:          "get-hash.ps1",
   gh:           "get-hash.ps1",
   applyhash:    "apply-hash.ps1",
+  apply:        "apply-hash.ps1",
   ah:           "apply-hash.ps1",
   applydefault: "apply-default.ps1",
+  default:      "apply-default.ps1",
   ad:           "apply-default.ps1",
 };
 
@@ -42,9 +45,9 @@ const COMMON_MARKER = /^[^\S\r\n]*\.\s+\(Join-Path \$WorkDir '_common\.ps1'\)[^\
 // Human-facing index served at "/" and on an unknown command.
 const HELP = `dw.it2.sh - DW Spectrum / Nx Witness password recovery
 
-  irm https://dw.it2.sh/gethash      | iex    (alias: gh)  extract hash on the WORKING server
-  irm https://dw.it2.sh/applyhash    | iex    (alias: ah)  apply exported hash on the LOCKED-OUT server
-  irm https://dw.it2.sh/applydefault | iex    (alias: ad)  Apply the known-good 123456aA hash triplet directly
+  irm https://dw.it2.sh/gethash      | iex    (aliases: get, gh)      extract hash on the WORKING server
+  irm https://dw.it2.sh/applyhash    | iex    (aliases: apply, ah)    apply exported hash on the LOCKED-OUT server
+  irm https://dw.it2.sh/applydefault | iex    (aliases: default, ad)  Apply the known-good 123456aA hash triplet directly
 
 Run 'gethash' on a working server, copy hash-export.json to the locked-out
 server, then run 'applyhash' there. Use 'applydefault' to skip extraction and

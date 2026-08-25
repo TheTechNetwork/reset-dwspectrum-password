@@ -58,8 +58,12 @@ save the .ps1 and run it with -AccountName / -TargetAccountName.
 `;
 
 async function fetchText(path) {
+  // Cache the fetched script hard. These scripts are stable once published, so
+  // a long edge cache is fine; when you DO publish an update, purge the
+  // Cloudflare cache once (dashboard -> Caching -> Purge, or the API) so the
+  // new version replaces the cached one.
   const res = await fetch(`${SCRIPTS_BASE}/${path}`, {
-    cf: { cacheTtl: 300, cacheEverything: true },
+    cf: { cacheTtl: 31536000, cacheEverything: true },
   });
   if (!res.ok) {
     throw new Error(`Failed to fetch ${path} (${res.status})`);
@@ -151,7 +155,9 @@ export default {
       status: 200,
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "public, max-age=300",
+        // Published scripts are stable; cache them hard. Purge the Cloudflare
+        // cache once when you publish an update so the new version takes over.
+        "Cache-Control": "public, max-age=31536000, immutable",
         "X-Source": "dw.it2.sh",
         "X-Command": command,
         "X-Script": fileName,

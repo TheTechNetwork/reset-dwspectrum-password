@@ -88,8 +88,8 @@ function Ensure-Sqlite3 {
       foreach ($year in @($curYear, ($curYear - 1))) {
         $url = "https://www.sqlite.org/$year/$fileName"
         try {
-          Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 10 -ErrorAction Stop | Out-Null
-          Invoke-WebRequest -Uri $url -OutFile $zipPath -ErrorAction Stop
+          Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop | Out-Null
+          Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing -ErrorAction Stop
           $extractDir = Join-Path $WorkDir 'sqlite-tools'
           Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
           $exe = Get-ChildItem $extractDir -Recurse -Filter 'sqlite3.exe' | Select-Object -First 1
@@ -102,7 +102,7 @@ function Ensure-Sqlite3 {
   # 2) Fallback: the pinned copy on dw.it2.sh, verified against $Sqlite3Sha256.
   Write-Host 'sqlite.org unavailable - falling back to https://dw.it2.sh/sqlite3.exe ...'
   try {
-    Invoke-WebRequest -Uri 'https://dw.it2.sh/sqlite3.exe' -OutFile $local -ErrorAction Stop
+    Invoke-WebRequest -Uri 'https://dw.it2.sh/sqlite3.exe' -OutFile $local -UseBasicParsing -ErrorAction Stop
     if (Test-Path $local) {
       $actual = (Get-FileHash -Path $local -Algorithm SHA256).Hash
       if ($actual -ne $Sqlite3Sha256) {

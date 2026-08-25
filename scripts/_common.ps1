@@ -77,6 +77,20 @@ function Ensure-Sqlite3 {
     return $local
   }
 
+  # A previous run may have left an extracted sqlite-tools folder (older
+  # behavior, or an interrupted run). Reuse the sqlite3.exe inside it,
+  # consolidating to $local and clearing the scaffolding, rather than
+  # re-downloading.
+  $toolsDir = Join-Path $WorkDir 'sqlite-tools'
+  $prior = Get-ChildItem $toolsDir -Recurse -Filter 'sqlite3.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($prior) {
+    Copy-Item $prior.FullName -Destination $local -Force
+    Remove-Item $toolsDir -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $WorkDir 'sqlite-tools.zip') -Force -ErrorAction SilentlyContinue
+    Write-Host "sqlite3.exe source: reused previously-extracted copy -> $local"
+    return $local
+  }
+
   Write-Host 'sqlite3.exe not found locally - fetching the official tool...'
 
   # 1) Official sqlite.org download (latest tools build).
@@ -101,8 +115,14 @@ function Ensure-Sqlite3 {
           Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
           $exe = Get-ChildItem $extractDir -Recurse -Filter 'sqlite3.exe' | Select-Object -First 1
           if ($exe) {
-            Write-Host "sqlite3.exe source: sqlite.org ($url) -> $($exe.FullName)"
-            return $exe.FullName
+            # Consolidate to a single sqlite3.exe and delete the zip + extracted
+            # folder, so nothing is left lying around and a re-run reuses this
+            # copy instead of downloading again.
+            Copy-Item $exe.FullName -Destination $local -Force
+            Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+            Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Host "sqlite3.exe source: sqlite.org ($url) -> $local"
+            return $local
           }
         } catch { continue }
       }

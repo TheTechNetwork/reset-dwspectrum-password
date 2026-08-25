@@ -3,8 +3,8 @@
 // Serves the DW Spectrum / Nx Witness password-hash recovery playbooks by
 // short URL so each can be run in one line:
 //
-//   irm https://dw.it2.sh/gethash      | iex   # Playbook 1 - extract (working server)
-//   irm https://dw.it2.sh/applyhash    | iex   # Playbook 2 - apply export (locked-out server)
+//   irm https://dw.it2.sh/gethash      | iex   # extract hash (working server)
+//   irm https://dw.it2.sh/applyhash    | iex   # apply exported hash (locked-out server)
 //   irm https://dw.it2.sh/applydefault | iex   # apply the known-good 123456aA hash directly
 //
 // Each command has a two-letter alias: gh / ah / ad. Matching is
@@ -18,24 +18,30 @@ const RAW_BASE =
 
 // Command (and alias) -> script filename in /scripts.
 const ROUTES = {
-  gethash:      "playbook-1-extract-hash.ps1",
-  gh:           "playbook-1-extract-hash.ps1",
-  applyhash:    "playbook-2-apply-hash.ps1",
-  ah:           "playbook-2-apply-hash.ps1",
-  applydefault: "apply-known-password.ps1",
-  ad:           "apply-known-password.ps1",
+  gethash:      "get-hash.ps1",
+  gh:           "get-hash.ps1",
+  applyhash:    "apply-hash.ps1",
+  ah:           "apply-hash.ps1",
+  applydefault: "apply-default.ps1",
+  ad:           "apply-default.ps1",
 };
 
 // Human-facing index served at "/" and on an unknown command.
 const HELP = `dw.it2.sh - DW Spectrum / Nx Witness password recovery
 
-  irm https://dw.it2.sh/gethash      | iex    (alias: gh)  Playbook 1 - extract hash on the WORKING server
-  irm https://dw.it2.sh/applyhash    | iex    (alias: ah)  Playbook 2 - apply exported hash on the LOCKED-OUT server
+  irm https://dw.it2.sh/gethash      | iex    (alias: gh)  extract hash on the WORKING server
+  irm https://dw.it2.sh/applyhash    | iex    (alias: ah)  apply exported hash on the LOCKED-OUT server
   irm https://dw.it2.sh/applydefault | iex    (alias: ad)  Apply the known-good 123456aA hash triplet directly
 
 Run 'gethash' on a working server, copy hash-export.json to the locked-out
 server, then run 'applyhash' there. Use 'applydefault' to skip extraction and
 apply a pre-verified hash for password 123456aA (rotate it immediately after).
+
+Run these in an ELEVATED PowerShell (Administrator). When piped to iex there is
+no script file, so working files (hash-export.json, backups, a downloaded
+sqlite3.exe) are written to your current directory -- cd to a working folder
+first. All three default to the 'admin' account; to target another account,
+save the .ps1 and run it with -AccountName / -TargetAccountName.
 `;
 
 async function fetchScript(fileName) {

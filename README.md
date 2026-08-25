@@ -1,17 +1,17 @@
 # dw.it2.sh
 
 A Cloudflare Worker that serves the **DW Spectrum / Nx Witness password-hash
-recovery playbooks** by short URL, so each can be run in a single line with
+recovery scripts** by short URL, so each can be run in a single line with
 `irm ... | iex`. It replaces having to copy full scripts around by hand.
 
 > These are an **unsupported workaround** for recovering a locked-out local
 > account (typically `admin`) without a factory reset. The vendor's documented
 > path is contacting support/your reseller with proof of license ownership —
 > use these only when that's too slow. Read
-> [`scripts/playbook-0-overview.md`](scripts/playbook-0-overview.md) first for
-> prerequisites and decision points.
+> [`scripts/overview.md`](scripts/overview.md) first for prerequisites and
+> decision points.
 
-## Usage
+## Commands
 
 Each command has a full name and a two-letter alias. Matching is
 case-insensitive and tolerates a leading slash, trailing slash, or `.ps1`
@@ -19,9 +19,9 @@ suffix.
 
 | Command | Alias | Script | Runs on |
 |---------|-------|--------|---------|
-| `gethash` | `gh` | Playbook 1 — extract hash (read-only) | the **working** server |
-| `applyhash` | `ah` | Playbook 2 — apply exported hash | the **locked-out** server |
-| `applydefault` | `ad` | Apply the known-good `123456aA` hash triplet | the **locked-out** server |
+| `gethash` | `gh` | [`scripts/get-hash.ps1`](scripts/get-hash.ps1) — extract hash (read-only) | the **working** server |
+| `applyhash` | `ah` | [`scripts/apply-hash.ps1`](scripts/apply-hash.ps1) — apply exported hash | the **locked-out** server |
+| `applydefault` | `ad` | [`scripts/apply-default.ps1`](scripts/apply-default.ps1) — apply the known `123456aA` hash | the **locked-out** server |
 
 ```powershell
 # 1) On a WORKING server of the same/compatible version — export a hash:
@@ -38,13 +38,30 @@ password `123456aA` (from a DW Spectrum `6.1.0.42176` reference install):
 irm https://dw.it2.sh/applydefault | iex   # or: irm https://dw.it2.sh/ad | iex
 ```
 
+Visiting <https://dw.it2.sh> with no path (or an unknown command) returns a
+plain-text index of the available commands.
+
+## Running the scripts
+
+- **Run in an elevated PowerShell (Administrator).** The system database lives
+  under the SYSTEM account's profile, so a non-elevated shell can't read it —
+  and `applyhash` / `applydefault` stop and start a Windows service.
+- **PowerShell 5.1 or 7 both work** — no special SDK is required.
+- **Where working files go.** When you pipe a script to `iex` there is *no
+  script file on disk*, so the scripts write their working files
+  (`hash-export.json`, backups, a downloaded `sqlite3.exe`) to your **current
+  directory** — `cd` into a working folder first. Run a saved `.ps1` instead and
+  those files sit next to the script. Each script prints its working directory
+  when it starts.
+- **Account.** All three default to the built-in `admin` account. To target a
+  different account, download the `.ps1` and run it with `-AccountName`
+  (`get-hash`) or `-TargetAccountName` (`apply-hash` / `apply-default`); the
+  one-liner form always uses the default account.
+
 > **Rotate the password immediately after recovery** — with `applydefault` the
 > hash is shared with the reference server it came from, and with `applyhash`
 > it may be reused from the source server. Delete `hash-export.json` from both
 > machines once done.
-
-Visiting <https://dw.it2.sh> with no path (or an unknown command) returns a
-plain-text index of the available commands.
 
 ## How it works
 
@@ -62,10 +79,10 @@ plain-text index of the available commands.
 |------|---------|
 | `worker/index.js` | The Cloudflare Worker (routing + live fetch) |
 | `wrangler.toml` | Worker config and the `dw.it2.sh` custom-domain route |
-| `scripts/playbook-0-overview.md` | Overview, prerequisites, decision points |
-| `scripts/playbook-1-extract-hash.ps1` | `gethash` / `gh` — extract on the working server |
-| `scripts/playbook-2-apply-hash.ps1` | `applyhash` / `ah` — apply on the locked-out server |
-| `scripts/apply-known-password.ps1` | `applydefault` / `ad` — apply the known `123456aA` hash |
+| `scripts/overview.md` | Overview, prerequisites, decision points |
+| `scripts/get-hash.ps1` | `gethash` / `gh` — extract on the working server |
+| `scripts/apply-hash.ps1` | `applyhash` / `ah` — apply on the locked-out server |
+| `scripts/apply-default.ps1` | `applydefault` / `ad` — apply the known `123456aA` hash |
 
 ## Deploying
 
@@ -73,4 +90,6 @@ plain-text index of the available commands.
 npx wrangler deploy
 ```
 
-The `[[routes]]` entry binds the Worker to the `dw.it2.sh` custom domain.
+The `[[routes]]` entry binds the Worker to the `dw.it2.sh` custom domain. Note
+the Worker fetches scripts from the `main` branch, so the routes only serve
+successfully once the scripts are present on `main`.

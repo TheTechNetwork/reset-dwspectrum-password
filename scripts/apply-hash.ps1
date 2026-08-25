@@ -36,7 +36,8 @@
 
 .PARAMETER Sqlite3Path
   Path to an existing sqlite3.exe. If omitted, looks in the working directory,
-  then downloads the official tool from sqlite.org if still not found.
+  then downloads the official tool from sqlite.org, and finally falls back to
+  https://dw.it2.sh/sqlite3.exe.
 
 .PARAMETER BackupRoot
   Directory to store the pre-edit backup. Default: a 'backups' folder in the
@@ -67,79 +68,10 @@ $WorkDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
 if (-not $InputFile)  { $InputFile  = Join-Path $WorkDir 'hash-export.json' }
 if (-not $BackupRoot) { $BackupRoot = Join-Path $WorkDir 'backups' }
 
-function Find-SystemDatabase {
-  $vendorCandidates = @(
-    'Digital Watchdog\Digital Watchdog Media Server',
-    'Network Optix\Network Optix Media Server'
-  )
-  $root = 'C:\Windows\System32\config\systemprofile\AppData\Local'
-  foreach ($candidate in $vendorCandidates) {
-    $p = Join-Path $root "$candidate\ecs.sqlite"
-    if (Test-Path $p) { return $p }
-  }
-  $found = Get-ChildItem $root -Recurse -Filter 'ecs.sqlite' -ErrorAction SilentlyContinue | Select-Object -First 1
-  if ($found) { return $found.FullName }
-  throw "Could not locate ecs.sqlite under $root. Check the MediaServer service account / install."
-}
-
-function Find-Version {
-  $installRoots = Get-ChildItem 'C:\Program Files' -Directory -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -match 'digital watchdog|network optix' }
-  foreach ($root in $installRoots) {
-    # Match only the MediaServer's own build_info.txt -- the same vendor root
-    # also contains a Client install with its own build_info.txt (and
-    # possibly a nested one under MediaServer\metadata), and "Client" can
-    # sort before "MediaServer" in directory enumeration, silently grabbing
-    # the wrong version.
-    $bi = Get-ChildItem $root.FullName -Recurse -Filter 'build_info.txt' -ErrorAction SilentlyContinue |
-      Where-Object { $_.FullName -match 'MediaServer\\build_info\.txt$' } | Select-Object -First 1
-    if ($bi) {
-      $line = Get-Content $bi.FullName | Where-Object { $_ -match '^version=' }
-      if ($line) { return ($line -replace '^version=','').Trim() }
-    }
-  }
-  return 'unknown'
-}
-
-function Find-MediaServerService {
-  $svc = Get-Service | Where-Object { $_.DisplayName -match 'spectrum|witness|digital watchdog|network optix|media server' } | Select-Object -First 1
-  if (-not $svc) { throw "Could not find the MediaServer Windows service. List services and pass its name explicitly if auto-detection fails." }
-  return $svc
-}
-
-function Ensure-Sqlite3 {
-  param([string]$PreferredPath)
-  if ($PreferredPath -and (Test-Path $PreferredPath)) { return $PreferredPath }
-  $local = Join-Path $WorkDir 'sqlite3.exe'
-  if (Test-Path $local) { return $local }
-
-  Write-Host 'sqlite3.exe not found locally - downloading the official tool from sqlite.org...'
-  $page = (Invoke-WebRequest -Uri 'https://sqlite.org/download.html' -UseBasicParsing).Content
-  $m = [regex]::Match($page, 'sqlite-tools-win-x64-(\d+)\.zip')
-  if (-not $m.Success) {
-    throw "Could not find the current sqlite-tools filename on the download page. Download it manually, extract sqlite3.exe into the working directory, and re-run."
-  }
-  $fileName = $m.Value
-  $zipPath = Join-Path $WorkDir 'sqlite-tools.zip'
-  $downloaded = $false
-  foreach ($year in @((Get-Date).Year, (Get-Date).Year - 1)) {
-    $url = "https://www.sqlite.org/$year/$fileName"
-    try {
-      Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 10 -ErrorAction Stop | Out-Null
-      Invoke-WebRequest -Uri $url -OutFile $zipPath -ErrorAction Stop
-      $downloaded = $true
-      break
-    } catch { continue }
-  }
-  if (-not $downloaded) {
-    throw "Could not download $fileName. Download it manually and extract sqlite3.exe into the working directory."
-  }
-  $extractDir = Join-Path $WorkDir 'sqlite-tools'
-  Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
-  $exe = Get-ChildItem $extractDir -Recurse -Filter 'sqlite3.exe' | Select-Object -First 1
-  if (-not $exe) { throw "sqlite3.exe not found inside the downloaded archive." }
-  return $exe.FullName
-}
+# Shared helpers (Find-*, Ensure-Sqlite3). Dot-sourced from _common.ps1 when this
+# runs as a saved .ps1 file; the dw.it2.sh worker inlines _common.ps1's contents
+# right here for the `irm | iex` payload.
+. (Join-Path $WorkDir '_common.ps1')
 
 Write-Host "=== apply-hash: apply hash to account '$TargetAccountName' ==="
 Write-Host "Working directory: $WorkDir"

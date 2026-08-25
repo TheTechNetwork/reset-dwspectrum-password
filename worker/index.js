@@ -1,6 +1,6 @@
 // Cloudflare Worker for dw.it2.sh
 //
-// Serves the DW Spectrum / Nx Witness password-hash recovery playbooks by
+// Serves the DW Spectrum / Nx Witness password-hash recovery scripts by
 // short URL so each can be run in one line:
 //
 //   irm https://dw.it2.sh/gethash      | iex   # extract hash (working server)
@@ -9,12 +9,21 @@
 //
 // Each command has a two-letter alias: gh / ah / ad. Matching is
 // case-insensitive and ignores a leading slash and .ps1 suffix.
+//
+// The command scripts keep their shared helpers in scripts/_common.ps1 and
+// dot-source it when run as a saved .ps1. For the one-liner there is no sibling
+// file, so this Worker inlines _common.ps1 into the served script (replacing the
+// dot-source line) - the delivered payload is always complete and self-contained.
+//
+// /sqlite3.exe serves the vendored copy of the SQLite CLI, which the scripts
+// fall back to (SHA-256 verified) when sqlite.org is unreachable.
 
-// Single source of truth: the scripts live in this repo. Fetched live from
-// the default branch so edits there are reflected automatically -- there is
-// no copy to keep in sync inside the Worker.
-const RAW_BASE =
-  "https://raw.githubusercontent.com/TheTechNetwork/reset-dwspectrum-password/main/scripts";
+// Single source of truth: the files live in this repo. Fetched live from the
+// default branch so edits there are reflected automatically -- there is no copy
+// to keep in sync inside the Worker.
+const REPO_RAW =
+  "https://raw.githubusercontent.com/TheTechNetwork/reset-dwspectrum-password/main";
+const SCRIPTS_BASE = `${REPO_RAW}/scripts`;
 
 // Command (and alias) -> script filename in /scripts.
 const ROUTES = {
@@ -25,6 +34,10 @@ const ROUTES = {
   applydefault: "apply-default.ps1",
   ad:           "apply-default.ps1",
 };
+
+// The dot-source line in each command script, replaced with the inlined
+// contents of _common.ps1 when serving. Matched leniently (any indentation).
+const COMMON_MARKER = /^[^\S\r\n]*\.\s+\(Join-Path \$WorkDir '_common\.ps1'\)[^\r\n]*$/m;
 
 // Human-facing index served at "/" and on an unknown command.
 const HELP = `dw.it2.sh - DW Spectrum / Nx Witness password recovery
@@ -44,14 +57,32 @@ first. All three default to the 'admin' account; to target another account,
 save the .ps1 and run it with -AccountName / -TargetAccountName.
 `;
 
-async function fetchScript(fileName) {
-  const res = await fetch(`${RAW_BASE}/${fileName}`, {
+async function fetchText(path) {
+  const res = await fetch(`${SCRIPTS_BASE}/${path}`, {
     cf: { cacheTtl: 300, cacheEverything: true },
   });
   if (!res.ok) {
-    throw new Error(`Failed to fetch ${fileName} (${res.status})`);
+    throw new Error(`Failed to fetch ${path} (${res.status})`);
   }
   return res.text();
+}
+
+// Fetch the command script and inline _common.ps1 at the dot-source marker so
+// the served payload needs no sibling file.
+async function buildScript(fileName) {
+  const [script, common] = await Promise.all([
+    fetchText(fileName),
+    fetchText("_common.ps1"),
+  ]);
+  if (!COMMON_MARKER.test(script)) {
+    // No marker: serve the script as-is rather than failing.
+    return script;
+  }
+  const banner =
+    "# --- begin inlined _common.ps1 (shared helpers) ---\n" +
+    common.replace(/\r?\n$/, "") +
+    "\n# --- end inlined _common.ps1 ---";
+  return script.replace(COMMON_MARKER, () => banner);
 }
 
 export default {
@@ -66,6 +97,26 @@ export default {
     // Ignore browser noise
     if (url.pathname === "/favicon.ico") {
       return new Response(null, { status: 204 });
+    }
+
+    // Vendored SQLite CLI, streamed from the repo. This is the offline fallback
+    // the scripts use (and SHA-256 verify) when sqlite.org is unreachable.
+    if (url.pathname === "/sqlite3.exe") {
+      const res = await fetch(`${REPO_RAW}/vendor/sqlite3.exe`, {
+        cf: { cacheTtl: 86400, cacheEverything: true },
+      });
+      if (!res.ok) {
+        return new Response(`sqlite3.exe not available (${res.status})\n`, { status: 502 });
+      }
+      return new Response(res.body, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "Content-Disposition": 'attachment; filename="sqlite3.exe"',
+          "Cache-Control": "public, max-age=86400",
+          "X-Source": "dw.it2.sh",
+        },
+      });
     }
 
     // First path segment -> command. Normalise: strip slashes, lowercase,
@@ -91,7 +142,7 @@ export default {
 
     let script;
     try {
-      script = await fetchScript(fileName);
+      script = await buildScript(fileName);
     } catch (err) {
       return new Response(`${err.message}\n`, { status: 502 });
     }

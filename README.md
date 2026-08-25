@@ -57,6 +57,11 @@ plain-text index of the available commands.
   different account, download the `.ps1` and run it with `-AccountName`
   (`get-hash`) or `-TargetAccountName` (`apply-hash` / `apply-default`); the
   one-liner form always uses the default account.
+- **sqlite3.exe.** The scripts need the SQLite CLI. They look for it in the
+  working directory, then download the current build from sqlite.org, and if
+  that's unreachable fall back to `https://dw.it2.sh/sqlite3.exe` — a pinned copy
+  vendored in this repo. The fallback download is **SHA-256 verified** against a
+  hash baked into the script, so a wrong or tampered file is rejected.
 
 > **Rotate the password immediately after recovery** — with `applydefault` the
 > hash is shared with the reference server it came from, and with `applyhash`
@@ -71,18 +76,27 @@ plain-text index of the available commands.
 - The script itself is fetched live from its canonical home in this repo under
   [`scripts/`](scripts/), so edits there are reflected automatically — there is
   no copy kept inside the Worker to keep in sync.
+- Shared helpers (`Find-*`, `Ensure-Sqlite3`) live once in
+  [`scripts/_common.ps1`](scripts/_common.ps1). Each command script dot-sources
+  it when run as a saved `.ps1`; when serving the one-liner the Worker **inlines**
+  `_common.ps1` into the script (replacing the dot-source line) so the delivered
+  payload is always complete and self-contained.
+- `/sqlite3.exe` streams the vendored SQLite CLI from
+  [`vendor/sqlite3.exe`](vendor/sqlite3.exe) — the offline fallback described above.
 - Unknown commands return `404` with the command index; `/health` returns `OK`.
 
 ## Repository layout
 
 | Path | Purpose |
 |------|---------|
-| `worker/index.js` | The Cloudflare Worker (routing + live fetch) |
+| `worker/index.js` | The Cloudflare Worker (routing, `_common.ps1` inlining, `/sqlite3.exe`) |
 | `wrangler.toml` | Worker config and the `dw.it2.sh` custom-domain route |
 | `scripts/overview.md` | Overview, prerequisites, decision points |
 | `scripts/get-hash.ps1` | `gethash` / `gh` — extract on the working server |
 | `scripts/apply-hash.ps1` | `applyhash` / `ah` — apply on the locked-out server |
 | `scripts/apply-default.ps1` | `applydefault` / `ad` — apply the known `123456aA` hash |
+| `scripts/_common.ps1` | Shared helpers (`Find-*`, `Ensure-Sqlite3`), inlined when served |
+| `vendor/sqlite3.exe` | Pinned SQLite CLI served at `/sqlite3.exe` (SHA-256 verified) |
 
 ## Deploying
 

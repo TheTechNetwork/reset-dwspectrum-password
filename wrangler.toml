@@ -1,0 +1,10 @@
+name = "dw"
+main = "worker/index.js"
+compatibility_date = "2024-11-01"
+
+[observability]
+enabled = true
+
+[[routes]]
+pattern = "dw.it2.sh"
+custom_domain = true

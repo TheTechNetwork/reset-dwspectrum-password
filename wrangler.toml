@@ -1,4 +1,4 @@
-name = "dw"
+name = "reset-dwspectrum-password"
 main = "worker/index.js"
 compatibility_date = "2024-11-01"
 

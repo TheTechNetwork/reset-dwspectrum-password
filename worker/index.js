@@ -59,8 +59,8 @@ const INCLUDE_BACKUPS_PARAM = /\[switch\]\$IncludeBackups(?!\s*=)/;
 // contents of _common.ps1 when serving. Matched leniently (any indentation).
 const COMMON_MARKER = /^[^\S\r\n]*\.\s+\(Join-Path \$WorkDir '_common\.ps1'\)[^\r\n]*$/m;
 
-// Human-facing index served at "/" and on an unknown command.
-const HELP = `dw.it2.sh - DW Spectrum / Nx Witness password recovery
+// Human-facing index shown at "/" and on an unknown command.
+const HELP_TEXT = `dw.it2.sh - DW Spectrum / Nx Witness password recovery
 
   irm https://dw.it2.sh/get     | iex    (aliases: gethash, gh)       extract hash on the WORKING server
   irm https://dw.it2.sh/apply   | iex    (aliases: applyhash, ah)     apply exported hash on the LOCKED-OUT server
@@ -76,8 +76,22 @@ Run these in an ELEVATED PowerShell (Administrator). When piped to iex there is
 no script file, so working files (hash-export.json, backups, a downloaded
 sqlite3.exe) are written to your current directory -- cd to a working folder
 first. All three default to the 'admin' account; to target another account,
-save the .ps1 and run it with -AccountName / -TargetAccountName.
-`;
+save the .ps1 and run it with -AccountName / -TargetAccountName.`;
+
+// Render the index as a small PowerShell script that just prints the text, so
+// `irm <root-or-unknown> | iex` shows the help cleanly instead of trying to
+// EXECUTE the example lines, and the response can be HTTP 200 (irm throws on a
+// 404, surfacing as a red error before the body is ever seen). A single-quoted
+// here-string keeps the body literal, so $, |, and # need no escaping.
+function helpScript(unknownCommand) {
+  // Sanitize the echoed command to a safe charset so it can't break out of the
+  // string it is printed in.
+  const safe = unknownCommand ? unknownCommand.replace(/[^a-z0-9._-]/gi, "") : "";
+  const notice = unknownCommand
+    ? `Write-Host "Unknown command: '${safe}' - showing available commands:" -ForegroundColor Yellow\nWrite-Host ''\n`
+    : "";
+  return `${notice}Write-Host @'\n${HELP_TEXT}\n'@\n`;
+}
 
 async function fetchText(path) {
   // Cache the fetched script hard. These scripts are stable once published, so
@@ -149,20 +163,24 @@ export default {
     const segment = url.pathname.replace(/^\/+/, "").replace(/\/+$/, "").split("/")[0];
     const command = decodeURIComponent(segment).toLowerCase().replace(/\.ps1$/, "");
 
-    // Root -> plain-text index of the available commands.
+    // Root -> the command index, as a runnable PowerShell script (see
+    // helpScript). 200 so `irm https://dw.it2.sh | iex` prints it cleanly.
     if (!command) {
-      return new Response(HELP, {
+      return new Response(helpScript(), {
         status: 200,
-        headers: { "Content-Type": "text/plain; charset=utf-8" },
+        headers: { "Content-Type": "text/plain; charset=utf-8", "X-Command": "(index)" },
       });
     }
 
     const fileName = ROUTES[command];
     if (!fileName) {
-      return new Response(
-        `Unknown command: "${command}".\n\n${HELP}`,
-        { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } }
-      );
+      // Unknown command -> the same index (noting the bad command), also as a
+      // runnable script at 200 so `irm .../typo | iex` shows help instead of a
+      // red 404 error in PowerShell.
+      return new Response(helpScript(command), {
+        status: 200,
+        headers: { "Content-Type": "text/plain; charset=utf-8", "X-Command": "(unknown)" },
+      });
     }
 
     let script;

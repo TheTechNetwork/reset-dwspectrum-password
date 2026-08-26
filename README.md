@@ -22,6 +22,7 @@ suffix.
 | `get` | `gethash`, `gh` | [`scripts/get-hash.ps1`](scripts/get-hash.ps1) — extract hash (read-only) | the **working** server |
 | `apply` | `applyhash`, `ah` | [`scripts/apply-hash.ps1`](scripts/apply-hash.ps1) — apply exported hash | the **locked-out** server |
 | `default` | `applydefault`, `ad` | [`scripts/apply-default.ps1`](scripts/apply-default.ps1) — apply the known `123456aA` hash | the **locked-out** server |
+| `clean` | `cleanup`, `clear`, `cls`, `c` | [`scripts/clean.ps1`](scripts/clean.ps1) — remove the working files left behind (keeps DB backups) | either server |
 
 ```powershell
 # 1) On a WORKING server of the same/compatible version — export a hash:
@@ -37,6 +38,17 @@ password `123456aA` (from a DW Spectrum `6.1.0.42176` reference install):
 ```powershell
 irm https://dw.it2.sh/default | iex    # aliases: /applydefault, /ad
 ```
+
+When you're finished, tidy up the working files a run leaves behind (a
+downloaded `sqlite3.exe` and its scaffolding, `hash-export.json`, the transient
+SQL file). Run this in the same directory:
+
+```powershell
+irm https://dw.it2.sh/clean | iex      # aliases: /cleanup, /clear, /cls, /c
+```
+
+`clean` keeps the pre-edit database backups by default (your restore point);
+delete those separately once the server is confirmed healthy.
 
 Visiting <https://dw.it2.sh> with no path (or an unknown command) returns a
 plain-text index of the available commands.
@@ -95,6 +107,7 @@ plain-text index of the available commands.
 | `scripts/get-hash.ps1` | `get` (aliases `gethash`, `gh`) — extract on the working server |
 | `scripts/apply-hash.ps1` | `apply` (aliases `applyhash`, `ah`) — apply on the locked-out server |
 | `scripts/apply-default.ps1` | `default` (aliases `applydefault`, `ad`) — apply the known `123456aA` hash |
+| `scripts/clean.ps1` | `clean` (aliases `cleanup`, `clear`, `cls`, `c`) — remove working files |
 | `scripts/_common.ps1` | Shared helpers (`Find-*`, `Ensure-Sqlite3`), inlined when served |
 | `vendor/sqlite3.exe` | Pinned SQLite CLI served at `/sqlite3.exe` (SHA-256 verified) |
 

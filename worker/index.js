@@ -36,6 +36,11 @@ const ROUTES = {
   applydefault: "apply-default.ps1",
   default:      "apply-default.ps1",
   ad:           "apply-default.ps1",
+  clean:        "clean.ps1",
+  cleanup:      "clean.ps1",
+  clear:        "clean.ps1",
+  cls:          "clean.ps1",
+  c:            "clean.ps1",
 };
 
 // The dot-source line in each command script, replaced with the inlined
@@ -48,6 +53,7 @@ const HELP = `dw.it2.sh - DW Spectrum / Nx Witness password recovery
   irm https://dw.it2.sh/get     | iex    (aliases: gethash, gh)       extract hash on the WORKING server
   irm https://dw.it2.sh/apply   | iex    (aliases: applyhash, ah)     apply exported hash on the LOCKED-OUT server
   irm https://dw.it2.sh/default | iex    (aliases: applydefault, ad)  Apply the known-good 123456aA hash triplet directly
+  irm https://dw.it2.sh/clean   | iex    (aliases: cleanup, clear, cls, c)  Remove the working files left behind (keeps DB backups)
 
 Run 'get' on a working server, copy hash-export.json to the locked-out
 server, then run 'apply' there. Use 'default' to skip extraction and
@@ -74,17 +80,16 @@ async function fetchText(path) {
   return res.text();
 }
 
-// Fetch the command script and inline _common.ps1 at the dot-source marker so
-// the served payload needs no sibling file.
+// Fetch the command script and, if it dot-sources _common.ps1, inline that
+// file's contents at the marker so the served payload needs no sibling file.
+// Scripts without the marker (e.g. clean.ps1) are served as-is, with no
+// dependency on _common.ps1.
 async function buildScript(fileName) {
-  const [script, common] = await Promise.all([
-    fetchText(fileName),
-    fetchText("_common.ps1"),
-  ]);
+  const script = await fetchText(fileName);
   if (!COMMON_MARKER.test(script)) {
-    // No marker: serve the script as-is rather than failing.
     return script;
   }
+  const common = await fetchText("_common.ps1");
   const banner =
     "# --- begin inlined _common.ps1 (shared helpers) ---\n" +
     common.replace(/\r?\n$/, "") +

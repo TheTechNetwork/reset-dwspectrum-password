@@ -12,6 +12,7 @@ Each script has a short URL on `dw.it2.sh` so it can be run in one line with
 | `get-hash.ps1` | `/get` | `/gethash`, `/gh` | **Working** server | Read out an account's password hash fields (read-only) |
 | `apply-hash.ps1` | `/apply` | `/applyhash`, `/ah` | **Locked-out** server | Write those fields onto the target account |
 | `apply-default.ps1` | `/default` | `/applydefault`, `/ad` | **Locked-out** server | Apply a pre-verified hash for password `123456aA`, skipping extraction |
+| `clean.ps1` | `/clean` | `/cleanup`, `/clear`, `/cls`, `/c` | Either server | Remove the working files a run leaves behind (keeps DB backups by default) |
 
 ```powershell
 # On the WORKING server:
@@ -108,8 +109,13 @@ treat it like a credential in transit (delete it from both machines once
 
 - Rotate the password on whichever account you just fixed, especially if
   it was reused from the working server.
-- Delete `hash-export.json` from both machines.
+- Delete `hash-export.json` from both machines. Running `/clean`
+  (`irm https://dw.it2.sh/clean | iex`) in the working directory removes it
+  along with the other scratch files (`sqlite3.exe` and its download
+  scaffolding, the transient SQL file).
 - If you created a throwaway account on the working server just to generate
   a known hash, delete/disable it there.
 - Keep the pre-edit backup from `apply-hash` until you've confirmed normal
-  operation (recording, user logins, camera list) for at least a day.
+  operation (recording, user logins, camera list) for at least a day. `/clean`
+  keeps that backup by default; delete it separately (or with
+  `.\clean.ps1 -IncludeBackups`) once you're satisfied.

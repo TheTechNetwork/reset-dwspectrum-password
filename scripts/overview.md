@@ -5,19 +5,21 @@ Nx Witness server by copying a password hash from a second, working server of
 the same/compatible version — no factory reset needed.
 
 Each script has a short URL on `dw.it2.sh` so it can be run in one line with
-`irm ... | iex`, plus a two-letter alias:
+`irm ... | iex`, plus longer aliases:
 
-| Script | URL command | Alias | Runs on | Purpose |
-|--------|-------------|-------|---------|---------|
-| `get-hash.ps1` | `/gethash` | `/gh` | **Working** server | Read out an account's password hash fields (read-only) |
-| `apply-hash.ps1` | `/applyhash` | `/ah` | **Locked-out** server | Write those fields onto the target account |
-| `apply-default.ps1` | `/applydefault` | `/ad` | **Locked-out** server | Apply a pre-verified hash for password `123456aA`, skipping extraction |
+| Script | URL command | Aliases | Runs on | Purpose |
+|--------|-------------|---------|---------|---------|
+| `get-hash.ps1` | `/get` | `/gethash`, `/gh` | **Working** server | Read out an account's password hash fields (read-only) |
+| `apply-hash.ps1` | `/apply` | `/applyhash`, `/ah` | **Locked-out** server | Write those fields onto the target account |
+| `apply-default.ps1` | `/default` | `/applydefault`, `/ad` | **Locked-out** server | Apply a pre-verified hash for password `123456aA`, skipping extraction |
+| `clean.ps1` | `/clean` | `/cleanup`, `/clear`, `/cls`, `/c` | Either server | Remove the working files a run leaves behind (keeps DB backups by default) |
+| `clean.ps1` | `/cleanall` | `/cleanupall`, `/clearall`, `/clsa`, `/ca` | Either server | Same, but also delete the pre-edit DB backups |
 
 ```powershell
 # On the WORKING server:
-irm https://dw.it2.sh/gethash | iex     # or /gh
+irm https://dw.it2.sh/get | iex     # aliases: /gethash, /gh
 # copy hash-export.json to the locked-out server, then on IT:
-irm https://dw.it2.sh/applyhash | iex   # or /ah
+irm https://dw.it2.sh/apply | iex   # aliases: /applyhash, /ah
 ```
 
 Not vendor-documented. Their actual supported path for this scenario is
@@ -81,11 +83,11 @@ not a first resort.
 ```
 [Working server]                          [Locked-out server]
       |                                          |
-get-hash.ps1  (/gethash | /gh)                   |
+get-hash.ps1  (/get)                             |
   -> reads digest/hash/cryptSha512Hash           |
   -> writes hash-export.json ------copy file----> |
       |                                          |
-      |                        apply-hash.ps1  (/applyhash | /ah)
+      |                        apply-hash.ps1  (/apply)
       |                          -> backs up live DB
       |                          -> stops service
       |                          -> writes the 3 fields via sqlite3.exe
@@ -94,7 +96,7 @@ get-hash.ps1  (/gethash | /gh)                   |
       +--------------- login with the known password on the target account
 ```
 
-`apply-default.ps1` (`/applydefault` | `/ad`) collapses this to a single step
+`apply-default.ps1` (`/default`) collapses this to a single step
 on the locked-out server when the known-good `123456aA` hash applies to your
 version — no working server or `hash-export.json` needed.
 
@@ -108,8 +110,14 @@ treat it like a credential in transit (delete it from both machines once
 
 - Rotate the password on whichever account you just fixed, especially if
   it was reused from the working server.
-- Delete `hash-export.json` from both machines.
+- Delete `hash-export.json` from both machines. Running `/clean`
+  (`irm https://dw.it2.sh/clean | iex`) in the working directory removes it
+  along with the other scratch files (`sqlite3.exe` and its download
+  scaffolding, the transient SQL file).
 - If you created a throwaway account on the working server just to generate
   a known hash, delete/disable it there.
 - Keep the pre-edit backup from `apply-hash` until you've confirmed normal
-  operation (recording, user logins, camera list) for at least a day.
+  operation (recording, user logins, camera list) for at least a day. `/clean`
+  keeps that backup by default; once you're satisfied, `/cleanall`
+  (`irm https://dw.it2.sh/cleanall | iex`) removes everything including the
+  backups.

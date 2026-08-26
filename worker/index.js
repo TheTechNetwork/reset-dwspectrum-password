@@ -36,7 +36,24 @@ const ROUTES = {
   applydefault: "apply-default.ps1",
   default:      "apply-default.ps1",
   ad:           "apply-default.ps1",
+  clean:        "clean.ps1",
+  cleanup:      "clean.ps1",
+  clear:        "clean.ps1",
+  cls:          "clean.ps1",
+  c:            "clean.ps1",
+  // "…all" variants serve clean.ps1 with -IncludeBackups forced on.
+  cleanall:     "clean.ps1",
+  cleanupall:   "clean.ps1",
+  clearall:     "clean.ps1",
+  clsa:         "clean.ps1",
+  ca:           "clean.ps1",
 };
+
+// Commands that serve clean.ps1 but should also delete the pre-edit DB backups.
+// The one-liner can't pass a switch, so the Worker flips the IncludeBackups
+// default to $true in the served script for these.
+const CLEAN_ALL = new Set(["cleanall", "cleanupall", "clearall", "clsa", "ca"]);
+const INCLUDE_BACKUPS_PARAM = /\[switch\]\$IncludeBackups(?!\s*=)/;
 
 // The dot-source line in each command script, replaced with the inlined
 // contents of _common.ps1 when serving. Matched leniently (any indentation).
@@ -45,12 +62,14 @@ const COMMON_MARKER = /^[^\S\r\n]*\.\s+\(Join-Path \$WorkDir '_common\.ps1'\)[^\
 // Human-facing index served at "/" and on an unknown command.
 const HELP = `dw.it2.sh - DW Spectrum / Nx Witness password recovery
 
-  irm https://dw.it2.sh/gethash      | iex    (aliases: get, gh)      extract hash on the WORKING server
-  irm https://dw.it2.sh/applyhash    | iex    (aliases: apply, ah)    apply exported hash on the LOCKED-OUT server
-  irm https://dw.it2.sh/applydefault | iex    (aliases: default, ad)  Apply the known-good 123456aA hash triplet directly
+  irm https://dw.it2.sh/get     | iex    (aliases: gethash, gh)       extract hash on the WORKING server
+  irm https://dw.it2.sh/apply   | iex    (aliases: applyhash, ah)     apply exported hash on the LOCKED-OUT server
+  irm https://dw.it2.sh/default | iex    (aliases: applydefault, ad)  Apply the known-good 123456aA hash triplet directly
+  irm https://dw.it2.sh/clean   | iex    (aliases: cleanup, clear, cls, c)  Remove the working files left behind (keeps DB backups)
+  irm https://dw.it2.sh/cleanall| iex    (aliases: cleanupall, clearall, clsa, ca)  Same, but ALSO delete the pre-edit DB backups
 
-Run 'gethash' on a working server, copy hash-export.json to the locked-out
-server, then run 'applyhash' there. Use 'applydefault' to skip extraction and
+Run 'get' on a working server, copy hash-export.json to the locked-out
+server, then run 'apply' there. Use 'default' to skip extraction and
 apply a pre-verified hash for password 123456aA (rotate it immediately after).
 
 Run these in an ELEVATED PowerShell (Administrator). When piped to iex there is
@@ -74,17 +93,16 @@ async function fetchText(path) {
   return res.text();
 }
 
-// Fetch the command script and inline _common.ps1 at the dot-source marker so
-// the served payload needs no sibling file.
+// Fetch the command script and, if it dot-sources _common.ps1, inline that
+// file's contents at the marker so the served payload needs no sibling file.
+// Scripts without the marker (e.g. clean.ps1) are served as-is, with no
+// dependency on _common.ps1.
 async function buildScript(fileName) {
-  const [script, common] = await Promise.all([
-    fetchText(fileName),
-    fetchText("_common.ps1"),
-  ]);
+  const script = await fetchText(fileName);
   if (!COMMON_MARKER.test(script)) {
-    // No marker: serve the script as-is rather than failing.
     return script;
   }
+  const common = await fetchText("_common.ps1");
   const banner =
     "# --- begin inlined _common.ps1 (shared helpers) ---\n" +
     common.replace(/\r?\n$/, "") +
@@ -152,6 +170,12 @@ export default {
       script = await buildScript(fileName);
     } catch (err) {
       return new Response(`${err.message}\n`, { status: 502 });
+    }
+
+    // "…all" clean variants: force -IncludeBackups on by flipping the switch
+    // default to $true, so the one-liner also removes the pre-edit DB backups.
+    if (CLEAN_ALL.has(command)) {
+      script = script.replace(INCLUDE_BACKUPS_PARAM, "[switch]$IncludeBackups = $true");
     }
 
     return new Response(script, {

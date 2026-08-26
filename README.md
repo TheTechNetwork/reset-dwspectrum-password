@@ -13,29 +13,47 @@ recovery scripts** by short URL, so each can be run in a single line with
 
 ## Commands
 
-Each command has a full name and a two-letter alias. Matching is
+Each command has a short primary name plus longer aliases. Matching is
 case-insensitive and tolerates a leading slash, trailing slash, or `.ps1`
 suffix.
 
-| Command | Alias | Script | Runs on |
-|---------|-------|--------|---------|
-| `gethash` | `gh` | [`scripts/get-hash.ps1`](scripts/get-hash.ps1) — extract hash (read-only) | the **working** server |
-| `applyhash` | `ah` | [`scripts/apply-hash.ps1`](scripts/apply-hash.ps1) — apply exported hash | the **locked-out** server |
-| `applydefault` | `ad` | [`scripts/apply-default.ps1`](scripts/apply-default.ps1) — apply the known `123456aA` hash | the **locked-out** server |
+| Command | Aliases | Script | Runs on |
+|---------|---------|--------|---------|
+| `get` | `gethash`, `gh` | [`scripts/get-hash.ps1`](scripts/get-hash.ps1) — extract hash (read-only) | the **working** server |
+| `apply` | `applyhash`, `ah` | [`scripts/apply-hash.ps1`](scripts/apply-hash.ps1) — apply exported hash | the **locked-out** server |
+| `default` | `applydefault`, `ad` | [`scripts/apply-default.ps1`](scripts/apply-default.ps1) — apply the known `123456aA` hash | the **locked-out** server |
+| `clean` | `cleanup`, `clear`, `cls`, `c` | [`scripts/clean.ps1`](scripts/clean.ps1) — remove the working files left behind (keeps DB backups) | either server |
+| `cleanall` | `cleanupall`, `clearall`, `clsa`, `ca` | [`scripts/clean.ps1`](scripts/clean.ps1) — same, but **also delete the pre-edit DB backups** | either server |
 
 ```powershell
 # 1) On a WORKING server of the same/compatible version — export a hash:
-irm https://dw.it2.sh/gethash | iex        # or: irm https://dw.it2.sh/gh | iex
+irm https://dw.it2.sh/get | iex        # aliases: /gethash, /gh
 
 # 2) Copy the resulting hash-export.json to the locked-out server, then:
-irm https://dw.it2.sh/applyhash | iex      # or: irm https://dw.it2.sh/ah | iex
+irm https://dw.it2.sh/apply | iex      # aliases: /applyhash, /ah
 ```
 
 Or skip the extraction step entirely and apply a pre-verified hash for the
 password `123456aA` (from a DW Spectrum `6.1.0.42176` reference install):
 
 ```powershell
-irm https://dw.it2.sh/applydefault | iex   # or: irm https://dw.it2.sh/ad | iex
+irm https://dw.it2.sh/default | iex    # aliases: /applydefault, /ad
+```
+
+When you're finished, tidy up the working files a run leaves behind (a
+downloaded `sqlite3.exe` and its scaffolding, `hash-export.json`, the transient
+SQL file). Run this in the same directory:
+
+```powershell
+irm https://dw.it2.sh/clean | iex      # aliases: /cleanup, /clear, /cls, /c
+```
+
+`clean` keeps the pre-edit database backups by default (your restore point).
+Once the server is confirmed healthy and you no longer need the restore point,
+use `cleanall` to remove **everything**, backups included:
+
+```powershell
+irm https://dw.it2.sh/cleanall | iex   # aliases: /cleanupall, /clearall, /clsa, /ca
 ```
 
 Visiting <https://dw.it2.sh> with no path (or an unknown command) returns a
@@ -45,7 +63,7 @@ plain-text index of the available commands.
 
 - **Run in an elevated PowerShell (Administrator).** The system database lives
   under the SYSTEM account's profile, so a non-elevated shell can't read it —
-  and `applyhash` / `applydefault` stop and start a Windows service.
+  and `apply` / `default` stop and start a Windows service.
 - **PowerShell 5.1 or 7 both work** — no special SDK is required.
 - **Where working files go.** When you pipe a script to `iex` there is *no
   script file on disk*, so the scripts write their working files
@@ -63,14 +81,14 @@ plain-text index of the available commands.
   vendored in this repo. The fallback download is **SHA-256 verified** against a
   hash baked into the script, so a wrong or tampered file is rejected.
 
-> **Rotate the password immediately after recovery** — with `applydefault` the
-> hash is shared with the reference server it came from, and with `applyhash`
+> **Rotate the password immediately after recovery** — with `default` the
+> hash is shared with the reference server it came from, and with `apply`
 > it may be reused from the source server. Delete `hash-export.json` from both
 > machines once done.
 
 ## How it works
 
-- The Worker takes the first path segment (e.g. `/gethash` or `/gh`), normalises
+- The Worker takes the first path segment (e.g. `/get` or `/gethash`), normalises
   it (lowercase, strips a leading/trailing slash and an optional `.ps1`), and
   maps it to the matching script.
 - The script itself is fetched live from its canonical home in this repo under
@@ -92,9 +110,10 @@ plain-text index of the available commands.
 | `worker/index.js` | The Cloudflare Worker (routing, `_common.ps1` inlining, `/sqlite3.exe`) |
 | `wrangler.toml` | Worker config and the `dw.it2.sh` custom-domain route |
 | `scripts/overview.md` | Overview, prerequisites, decision points |
-| `scripts/get-hash.ps1` | `gethash` / `gh` — extract on the working server |
-| `scripts/apply-hash.ps1` | `applyhash` / `ah` — apply on the locked-out server |
-| `scripts/apply-default.ps1` | `applydefault` / `ad` — apply the known `123456aA` hash |
+| `scripts/get-hash.ps1` | `get` (aliases `gethash`, `gh`) — extract on the working server |
+| `scripts/apply-hash.ps1` | `apply` (aliases `applyhash`, `ah`) — apply on the locked-out server |
+| `scripts/apply-default.ps1` | `default` (aliases `applydefault`, `ad`) — apply the known `123456aA` hash |
+| `scripts/clean.ps1` | `clean` — remove working files; `cleanall` also deletes DB backups (plus the short aliases) |
 | `scripts/_common.ps1` | Shared helpers (`Find-*`, `Ensure-Sqlite3`), inlined when served |
 | `vendor/sqlite3.exe` | Pinned SQLite CLI served at `/sqlite3.exe` (SHA-256 verified) |
 

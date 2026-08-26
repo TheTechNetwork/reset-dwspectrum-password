@@ -45,12 +45,12 @@ const COMMON_MARKER = /^[^\S\r\n]*\.\s+\(Join-Path \$WorkDir '_common\.ps1'\)[^\
 // Human-facing index served at "/" and on an unknown command.
 const HELP = `dw.it2.sh - DW Spectrum / Nx Witness password recovery
 
-  irm https://dw.it2.sh/gethash      | iex    (aliases: get, gh)      extract hash on the WORKING server
-  irm https://dw.it2.sh/applyhash    | iex    (aliases: apply, ah)    apply exported hash on the LOCKED-OUT server
-  irm https://dw.it2.sh/applydefault | iex    (aliases: default, ad)  Apply the known-good 123456aA hash triplet directly
+  irm https://dw.it2.sh/get     | iex    (aliases: gethash, gh)       extract hash on the WORKING server
+  irm https://dw.it2.sh/apply   | iex    (aliases: applyhash, ah)     apply exported hash on the LOCKED-OUT server
+  irm https://dw.it2.sh/default | iex    (aliases: applydefault, ad)  Apply the known-good 123456aA hash triplet directly
 
-Run 'gethash' on a working server, copy hash-export.json to the locked-out
-server, then run 'applyhash' there. Use 'applydefault' to skip extraction and
+Run 'get' on a working server, copy hash-export.json to the locked-out
+server, then run 'apply' there. Use 'default' to skip extraction and
 apply a pre-verified hash for password 123456aA (rotate it immediately after).
 
 Run these in an ELEVATED PowerShell (Administrator). When piped to iex there is

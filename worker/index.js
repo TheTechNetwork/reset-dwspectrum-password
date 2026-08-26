@@ -41,7 +41,19 @@ const ROUTES = {
   clear:        "clean.ps1",
   cls:          "clean.ps1",
   c:            "clean.ps1",
+  // "…all" variants serve clean.ps1 with -IncludeBackups forced on.
+  cleanall:     "clean.ps1",
+  cleanupall:   "clean.ps1",
+  clearall:     "clean.ps1",
+  clsa:         "clean.ps1",
+  ca:           "clean.ps1",
 };
+
+// Commands that serve clean.ps1 but should also delete the pre-edit DB backups.
+// The one-liner can't pass a switch, so the Worker flips the IncludeBackups
+// default to $true in the served script for these.
+const CLEAN_ALL = new Set(["cleanall", "cleanupall", "clearall", "clsa", "ca"]);
+const INCLUDE_BACKUPS_PARAM = /\[switch\]\$IncludeBackups(?!\s*=)/;
 
 // The dot-source line in each command script, replaced with the inlined
 // contents of _common.ps1 when serving. Matched leniently (any indentation).
@@ -54,6 +66,7 @@ const HELP = `dw.it2.sh - DW Spectrum / Nx Witness password recovery
   irm https://dw.it2.sh/apply   | iex    (aliases: applyhash, ah)     apply exported hash on the LOCKED-OUT server
   irm https://dw.it2.sh/default | iex    (aliases: applydefault, ad)  Apply the known-good 123456aA hash triplet directly
   irm https://dw.it2.sh/clean   | iex    (aliases: cleanup, clear, cls, c)  Remove the working files left behind (keeps DB backups)
+  irm https://dw.it2.sh/cleanall| iex    (aliases: cleanupall, clearall, clsa, ca)  Same, but ALSO delete the pre-edit DB backups
 
 Run 'get' on a working server, copy hash-export.json to the locked-out
 server, then run 'apply' there. Use 'default' to skip extraction and
@@ -157,6 +170,12 @@ export default {
       script = await buildScript(fileName);
     } catch (err) {
       return new Response(`${err.message}\n`, { status: 502 });
+    }
+
+    // "…all" clean variants: force -IncludeBackups on by flipping the switch
+    // default to $true, so the one-liner also removes the pre-edit DB backups.
+    if (CLEAN_ALL.has(command)) {
+      script = script.replace(INCLUDE_BACKUPS_PARAM, "[switch]$IncludeBackups = $true");
     }
 
     return new Response(script, {

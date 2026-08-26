@@ -23,6 +23,7 @@ suffix.
 | `apply` | `applyhash`, `ah` | [`scripts/apply-hash.ps1`](scripts/apply-hash.ps1) — apply exported hash | the **locked-out** server |
 | `default` | `applydefault`, `ad` | [`scripts/apply-default.ps1`](scripts/apply-default.ps1) — apply the known `123456aA` hash | the **locked-out** server |
 | `clean` | `cleanup`, `clear`, `cls`, `c` | [`scripts/clean.ps1`](scripts/clean.ps1) — remove the working files left behind (keeps DB backups) | either server |
+| `cleanall` | `cleanupall`, `clearall`, `clsa`, `ca` | [`scripts/clean.ps1`](scripts/clean.ps1) — same, but **also delete the pre-edit DB backups** | either server |
 
 ```powershell
 # 1) On a WORKING server of the same/compatible version — export a hash:
@@ -47,8 +48,13 @@ SQL file). Run this in the same directory:
 irm https://dw.it2.sh/clean | iex      # aliases: /cleanup, /clear, /cls, /c
 ```
 
-`clean` keeps the pre-edit database backups by default (your restore point);
-delete those separately once the server is confirmed healthy.
+`clean` keeps the pre-edit database backups by default (your restore point).
+Once the server is confirmed healthy and you no longer need the restore point,
+use `cleanall` to remove **everything**, backups included:
+
+```powershell
+irm https://dw.it2.sh/cleanall | iex   # aliases: /cleanupall, /clearall, /clsa, /ca
+```
 
 Visiting <https://dw.it2.sh> with no path (or an unknown command) returns a
 plain-text index of the available commands.
@@ -107,7 +113,7 @@ plain-text index of the available commands.
 | `scripts/get-hash.ps1` | `get` (aliases `gethash`, `gh`) — extract on the working server |
 | `scripts/apply-hash.ps1` | `apply` (aliases `applyhash`, `ah`) — apply on the locked-out server |
 | `scripts/apply-default.ps1` | `default` (aliases `applydefault`, `ad`) — apply the known `123456aA` hash |
-| `scripts/clean.ps1` | `clean` (aliases `cleanup`, `clear`, `cls`, `c`) — remove working files |
+| `scripts/clean.ps1` | `clean` — remove working files; `cleanall` also deletes DB backups (plus the short aliases) |
 | `scripts/_common.ps1` | Shared helpers (`Find-*`, `Ensure-Sqlite3`), inlined when served |
 | `vendor/sqlite3.exe` | Pinned SQLite CLI served at `/sqlite3.exe` (SHA-256 verified) |
 

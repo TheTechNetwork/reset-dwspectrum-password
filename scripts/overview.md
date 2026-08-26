@@ -13,6 +13,7 @@ Each script has a short URL on `dw.it2.sh` so it can be run in one line with
 | `apply-hash.ps1` | `/apply` | `/applyhash`, `/ah` | **Locked-out** server | Write those fields onto the target account |
 | `apply-default.ps1` | `/default` | `/applydefault`, `/ad` | **Locked-out** server | Apply a pre-verified hash for password `123456aA`, skipping extraction |
 | `clean.ps1` | `/clean` | `/cleanup`, `/clear`, `/cls`, `/c` | Either server | Remove the working files a run leaves behind (keeps DB backups by default) |
+| `clean.ps1` | `/cleanall` | `/cleanupall`, `/clearall`, `/clsa`, `/ca` | Either server | Same, but also delete the pre-edit DB backups |
 
 ```powershell
 # On the WORKING server:
@@ -117,5 +118,6 @@ treat it like a credential in transit (delete it from both machines once
   a known hash, delete/disable it there.
 - Keep the pre-edit backup from `apply-hash` until you've confirmed normal
   operation (recording, user logins, camera list) for at least a day. `/clean`
-  keeps that backup by default; delete it separately (or with
-  `.\clean.ps1 -IncludeBackups`) once you're satisfied.
+  keeps that backup by default; once you're satisfied, `/cleanall`
+  (`irm https://dw.it2.sh/cleanall | iex`) removes everything including the
+  backups.
